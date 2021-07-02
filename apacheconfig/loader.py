@@ -1,7 +1,7 @@
 #
 # This file is part of apacheconfig software.
 #
-# Copyright (c) 2018-2020, Ilya Etingof <etingof@gmail.com>
+# Copyright (c) 2018-2019, Ilya Etingof <etingof@gmail.com>
 # License: https://github.com/etingof/apacheconfig/LICENSE.rst
 #
 from __future__ import unicode_literals
@@ -185,12 +185,14 @@ class ApacheConfigLoader(object):
 
     def g_includeoptional(self, ast):
         try:
-            return self.g_include(ast)
+            self.g_include(ast)
+            return { "IncludeOptional": self._unquote_tag(ast[0])}
 
         except error.ConfigFileReadError:
             return {}
 
     def g_include(self, ast):
+        
         filepath = self._unquote_tag(ast[0])
 
         options = self._options
@@ -244,6 +246,10 @@ class ApacheConfigLoader(object):
                 return self.load(filepath, initialize=False)
 
         else:
+            # print( 'Currently do not handle this. Config file "%s" not found in search path %s'
+                # % (filename, ':'.join(configpath)))
+
+            return {'Include': filepath}
             raise error.ConfigFileReadError(
                 'Config file "%s" not found in search path %s'
                 % (filename, ':'.join(configpath)))
@@ -417,45 +423,60 @@ class ApacheConfigLoader(object):
         for key, val in obj.items():
             if isinstance(val, six.text_type):
                 if val.isalnum():
+                    # text += "bob"
                     text += '%s%s %s\n' % (spacing, key, val)
                 else:
-                    text += '%s%s "%s"\n' % (spacing, key, val)
+                    # text += "hi"
+                    text += '%s%s %s\n' % (spacing, key, val)
 
             elif isinstance(val, list):
                 for dup in val:
                     if isinstance(dup, six.text_type):
+                        
                         if dup.isalnum():
+                            # text += "hmm"
                             text += '%s%s %s\n' % (spacing, key, dup)
                         else:
-                            text += '%s%s "%s"\n' % (spacing, key, dup)
+                            # text += "name"
+                            # text += dup + " \n"
+                            text += '%s%s %s\n' % (spacing, key, dup)
                     else:
                         if self._options.get('namedblocks', True):
+                            # text += "hello"
                             text += ('%s<%s>\n%s%s</%s>\n'
                                      % (spacing, key,
                                         self._dumpdict(dup, indent + 2),
                                         spacing, key))
                         else:
-                            text += ('%s<%s %s%s</%s>\n'
+                            # text += "right"
+                            key_split = str(key).split()
+                            text += ('%s<%s>\n%s%s</%s>\n'
                                      % (spacing, key,
                                         self._dumpdict(dup, indent + 2,
                                                        continue_tag=True),
-                                        spacing, key))
+                                        spacing, key_split[0]))
 
             else:
-                if self._options.get('namedblocks', True):
+                if self._options.get('namedblocks', False):
+                    
                     text += ('%s<%s>\n%s%s</%s>\n'
                              % (spacing, key, self._dumpdict(val, indent + 2),
                                 spacing, key))
                 else:
                     if continue_tag:
-                        text += ('%s>\n%s'
-                                 % (key, self._dumpdict(val, indent + 2)))
+                        # text += "bye"
+                        key_split = str(key).split()
+                        text += ('<%s>\n%s%s</%s>\n'
+                                 % (key, self._dumpdict(val, indent + 2),spacing, key_split[0]))
                     else:
-                        text += ('%s<%s %s%s</%s>\n'
+                        # text += "wait"
+                        # text += ('%s<%s %s%s</%s>\n'
+                        key_split = str(key).split()
+                        text += ('%s<%s>\n%s%s</%s>\n'
                                  % (spacing, key,
                                     self._dumpdict(val, indent + 2,
                                                    continue_tag=True),
-                                    spacing, key))
+                                    spacing, key_split[0]))
         return text
 
     def dumps(self, dct):
@@ -476,8 +497,8 @@ class ApacheConfigLoader(object):
             filepath (Text): Filepath to write config to, in UTF-8 encoding.
             dct (dict): Configuration represented as a dictionary.
         """
-        tmpf = tempfile.NamedTemporaryFile(
-            dir=os.path.dirname(filepath), delete=False)
+        tmpf = tempfile.NamedTemporaryFile(dir=os.path.dirname(filepath),
+                                           delete=False)
 
         try:
             with io.open(tmpf.name, mode='w', encoding='utf-8') as f:
@@ -486,8 +507,11 @@ class ApacheConfigLoader(object):
             os.rename(tmpf.name, filepath)
 
         except IOError as ex:
-            if os.path.exists(tmpf.name):
+            try:
                 os.unlink(tmpf.name)
 
-            raise error.ApacheConfigError(
-                'File %s can\'t be written: %s' % (filepath, ex))
+            except Exception:
+                pass
+
+            raise error.ApacheConfigError('File %s can\'t be written: %s'
+                                          % (filepath, ex))
