@@ -427,7 +427,10 @@ class ApacheConfigLoader(object):
                     text += '%s%s %s\n' % (spacing, key, val)
                 else:
                     # text += "hi"
-                    text += '%s%s %s\n' % (spacing, key, val)
+                    if key == "AuthName":
+                        text += '%s%s "%s"\n' % (spacing, key, val)
+                    else: 
+                        text += '%s%s %s\n' % (spacing, key, val)
 
             elif isinstance(val, list):
                 for dup in val:
